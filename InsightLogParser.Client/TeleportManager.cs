@@ -54,12 +54,31 @@ internal class TeleportManager
     {
         var delta = target - current;
         var distance = target.GetDistance3d(current);
+        
+        var angleInRadians = Math.Atan2(delta.Y, delta.X);
+        var angleInDegrees = angleInRadians * (180 / Math.PI);
+        var normalizedAngle = (angleInDegrees + 360) % 360;
+        string verticalString = delta.Z < 0 ? "↓" : "↑";
+
+        string compassString = (double)(Math.Round(normalizedAngle / 45) % 8) switch
+        {
+            0 => "→",
+            1 => "↘",
+            2 => "↓",
+            3 => "↙",
+            4 => "←",
+            5 => "↖",
+            6 => "↑",
+            7 => "↗",
+            _ => "→",
+        };        
 
         var xString = delta.X < 0 ? $"{-delta.X/100:####}m west" : $"{delta.X/100:####}m east";
         var yString = delta.Y < 0 ? $"{-delta.Y/100:####}m north" : $"{delta.Y/100:####}m south";
         var zString = delta.Z < 0 ? $"{-delta.Z/100:####}m down" : $"{delta.Z/100:####}m up";
         var targetTypeString = puzzleType != null ? $" {puzzleType}" : null;
-        writer.WriteInfo($"Target{targetTypeString}: {distance/100:####}m ({xString}, {yString}, {zString})");
+
+        writer.WriteInfo($"Target{targetTypeString}: {compassString} {distance/100:####}m {verticalString} ({yString}, {xString}, {zString})");
     }
 
     public Coordinate? GetLastTeleport()
