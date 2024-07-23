@@ -142,8 +142,48 @@ internal class PuzzleRouter
         var timer = Stopwatch.StartNew();
         _writer.WriteInfo($"Calculating route for {valid.Count} puzzles...");
 
-        var initial = new Quadrant()
+        // Quadrant algorithm
+        var quadrantPath = QuadrantPath(startCoordinate, valid);
+        var quadrantDistance = GetPathDistance(startCoordinate, quadrantPath);
+
+        // Nearest Neighbor Algorithm
+        var nearestNeighborPath = NearestNeighborPath(startCoordinate, valid);
+        var nearestNeighborDistance = GetPathDistance(startCoordinate, nearestNeighborPath);
+
+        double distance;
+        if (quadrantDistance < nearestNeighborDistance)
         {
+            _writer.WriteDebug($"Quadrant path is shorter by {nearestNeighborDistance - quadrantDistance:F0}m");
+            _sequence = quadrantPath;
+            distance = quadrantDistance;
+        }
+        else
+        {
+            _writer.WriteDebug($"Nearest neighbor path is shorter by {quadrantDistance - nearestNeighborDistance:F0}m");
+            _sequence = nearestNeighborPath;
+            distance = nearestNeighborDistance;
+        }
+
+        timer.Stop();
+
+        _writer.WriteInfo($"Done in {timer.ElapsedMilliseconds} ms, total route length is {distance:F0}m from last teleport");
+
+        _sequenceIndex = -1;
+        _solvedForCurrentRoute = new HashSet<int>();
+    }
+
+    public static double GetPathDistance(Coordinate startCoordinate, List<RouteNode> path)
+    {
+        return path.Skip(1).Aggregate((Length: 0D, Previous: startCoordinate), (previous, next) =>
+        {
+            var nextCoord = next.Puzzle.PrimaryCoordinate!.Value;
+            return (Length: previous.Length + previous.Previous.GetDistance3d(nextCoord), Previous: nextCoord);
+        }).Length / 100;
+    }
+
+    public List<RouteNode> QuadrantPath(Coordinate startCoordinate, List<RouteNode> valid)
+    {
+        var initial = new Quadrant() {
             Name = "Q",
             Nodes = valid,
             MaxX = valid.Max(x => x.Puzzle.PrimaryCoordinate!.Value.X),
@@ -169,17 +209,25 @@ internal class PuzzleRouter
             quadrants.Remove(nextQuadrant);
             fullPath.AddRange(Solve(nextQuadrant, lastCoordinate));
         }
-        timer.Stop();
-        var distance = fullPath.Aggregate((Length: 0D, Previous: startCoordinate), (previous, next) =>
-        {
-            var nextCoord = next.Puzzle.PrimaryCoordinate!.Value;
-            return (Length: previous.Length + previous.Previous.GetDistance3d(nextCoord), Previous: nextCoord);
-        }).Length / 100;
-        _writer.WriteInfo($"Done in {timer.ElapsedMilliseconds} ms, total route length is {distance:F0}m from last teleport");
 
-        _sequence = fullPath;
-        _sequenceIndex = -1;
-        _solvedForCurrentRoute = new HashSet<int>();
+        return fullPath;
+    }
+
+    public List<RouteNode> NearestNeighborPath(Coordinate startCoordinate, List<RouteNode> valid)
+    {
+        List<RouteNode> fullPath = new List<RouteNode>();
+        var currentCoordinate = startCoordinate;
+        var unvisited = new HashSet<RouteNode>(valid);
+
+        while (unvisited.Count > 0)
+        {
+            var nextNode = unvisited.MinBy(node => node.Puzzle.PrimaryCoordinate!.Value.GetDistance3d(currentCoordinate));
+            unvisited.Remove(nextNode);
+            fullPath.Add(nextNode);
+            currentCoordinate = nextNode.Puzzle.PrimaryCoordinate!.Value;
+        }
+
+        return fullPath;
     }
 
     public void ClearRoute()
