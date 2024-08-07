@@ -1,8 +1,11 @@
+using System.Text;
 using InsightLogParser.Client;
 using InsightLogParser.Client.Websockets;
 
 try
 {
+    Console.OutputEncoding = Encoding.UTF8;
+
     var forcedExitSource = new CancellationTokenSource();
 
     AppDomain.CurrentDomain.ProcessExit += async (sender, eventArgs) => { await forcedExitSource.CancelAsync(); };
