@@ -215,6 +215,8 @@ internal class PuzzleRouter
 
     public List<RouteNode> NearestNeighborPath(Coordinate startCoordinate, List<RouteNode> valid)
     {
+        var timer = Stopwatch.StartNew();
+
         List<RouteNode> fullPath = new List<RouteNode>();
         var currentCoordinate = startCoordinate;
         var unvisited = new HashSet<RouteNode>(valid);
@@ -225,6 +227,59 @@ internal class PuzzleRouter
             unvisited.Remove(nextNode);
             fullPath.Add(nextNode);
             currentCoordinate = nextNode.Puzzle.PrimaryCoordinate!.Value;
+        }
+
+        if (fullPath.Count > 2)
+        {
+            while (timer.ElapsedMilliseconds < 1000)
+            {
+                // Find the node in the route that has the most total distance to its neighbors, excluding the first and last node.
+                var longestNode = fullPath.Skip(1).SkipLast(1).MaxBy(node =>
+                {
+                    var index = fullPath.IndexOf(node);
+                    var previous = fullPath[index - 1].Puzzle.PrimaryCoordinate!.Value;
+                    var next = fullPath[index + 1].Puzzle.PrimaryCoordinate!.Value;
+                    return previous.GetDistance3d(node.Puzzle.PrimaryCoordinate!.Value) + next.GetDistance3d(node.Puzzle.PrimaryCoordinate!.Value);
+                });
+
+                // If a node wasn't found for some reason, we're done.
+                if (longestNode == null) {
+                    break;
+                }
+
+                // Find the place in the route where inserting the longest node would result in the shortest total distance.
+                var bestIndex = -1;
+
+                var bestDistance = GetPathDistance(startCoordinate, fullPath);
+
+                for (var i = 1; i < fullPath.Count - 1; i++)
+                {
+                    // Create a path that includes the longest node at the current index.
+                    var newPath = fullPath.ToList();
+                    newPath.Remove(longestNode);
+                    newPath.Insert(i, longestNode);
+
+                    // Calculate the total distance of the new path.
+                    var newDistance = GetPathDistance(startCoordinate, newPath);
+                    
+                    // If the new path is shorter than the best path, update the best path and index.
+                    if (newDistance < bestDistance)
+                    {
+                        bestDistance = newDistance;
+                        bestIndex = i;
+                    }
+                }
+
+                // If the best index isn't set or is the same as the current index, we're done.
+                if (bestIndex == -1 || bestIndex == fullPath.IndexOf(longestNode))
+                {
+                    break;
+                }
+
+                // Otherwise, insert the node at the best index.
+                fullPath.Remove(longestNode);
+                fullPath.Insert(bestIndex, longestNode);
+            }
         }
 
         return fullPath;
